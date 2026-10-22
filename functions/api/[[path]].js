@@ -7,7 +7,7 @@ const rnd=n=>hex(crypto.getRandomValues(new Uint8Array(n)));
 const sha=async s=>hex(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)));
 function eq(a,b){if(a.length!==b.length)return false;let r=0;for(let i=0;i<a.length;i++)r|=a.charCodeAt(i)^b.charCodeAt(i);return r===0}
 const cookie=(r,n)=>((r.headers.get('cookie')||'').match(new RegExp('(?:^|; )'+n+'=([^;]*)'))||[])[1];
-async function me(env,req){const t=cookie(req,'pp_sess');if(!t)return null;const h=await sha(t);return await env.DB.prepare('SELECT u.id,u.email,u.name,u.role,u.must_change FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?').bind(h,Date.now()).first()}
+async function me(env,req){const t=cookie(req,'pp_sess');if(!t)return null;const h=await sha(t);return await env.DB.prepare('SELECT u.id,u.email,u.name,u.role,u.must_change FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>? AND u.active=1').bind(h,Date.now()).first()}
 const istNow=()=>new Date(Date.now()+19800000);
 const pad=n=>String(n).padStart(2,'0');
 const mins=t=>{const[a,b]=t.split(':').map(Number);return a*60+b};
@@ -36,6 +36,7 @@ export async function onRequest({request,env,params}){
   if(m!=='GET'&&m!=='HEAD'&&path!=='/webhook/razorpay'){const ct=request.headers.get('content-type')||'';if(!ct.includes('application/json'))return J({error:'Bad content type'},415);const o=request.headers.get('origin');if(o&&o!==url.origin)return J({error:'Bad origin'},403)}
   const body=async()=>{try{return await request.json()}catch{return{}}};
   try{
+  {const X=await pubExtra(env,path,m,body,url,request);if(X)return X}
   // ---------- public ----------
   if(path==='/studios'&&m==='GET'){return J((await env.DB.prepare('SELECT id,city,name,slot_minutes FROM studios WHERE active=1 ORDER BY id').all()).results)}
   if(path==='/slots'&&m==='GET'){return J(await slots(env,+url.searchParams.get('studio'),url.searchParams.get('date')||''))}
@@ -56,7 +57,7 @@ export async function onRequest({request,env,params}){
   if(path==='/login'&&m==='POST'){
     const b=await body();const email=clean(b.email,200).toLowerCase(),pw=String(b.password||'');
     let u=await env.DB.prepare('SELECT * FROM users WHERE email=?').bind(email).first();
-    if(!u||!eq(await hashPw(pw,u.pass_salt),u.pass_hash)){await new Promise(r=>setTimeout(r,400));return J({error:'Incorrect email or password.'},401)}
+    if(!u||u.active===0||!eq(await hashPw(pw,u.pass_salt),u.pass_hash)){await new Promise(r=>setTimeout(r,400));return J({error:'Incorrect email or password.'},401)}
     const tok=rnd(32);await env.DB.prepare('INSERT INTO sessions VALUES(?,?,?)').bind(await sha(tok),u.id,Date.now()+7*864e5).run();
     await env.DB.prepare('DELETE FROM sessions WHERE expires_at<?').bind(Date.now()).run();
     return J({ok:true,role:u.role,must_change:u.must_change},200,{'set-cookie':`pp_sess=${tok}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=604800`})}
@@ -65,6 +66,7 @@ export async function onRequest({request,env,params}){
   if(path==='/me'&&m==='GET')return u?J(u):J({error:'Not signed in'},401);
   if(!u)return J({error:'Not signed in'},401);
   if(u.must_change&&path!=='/password')return J({error:'Please set a new password first.'},403);
+  {const X=await extra({env,u,path,m,body,url});if(X)return X}
   if(path==='/password'&&m==='POST'){const b=await body();const pw=String(b.new||'');if(pw.length<10)return J({error:'Use at least 10 characters.'},400);const row=await env.DB.prepare('SELECT * FROM users WHERE id=?').bind(u.id).first();if(!eq(await hashPw(String(b.current||''),row.pass_salt),row.pass_hash))return J({error:'Current password is incorrect.'},403);const salt=rnd(16);await env.DB.prepare('UPDATE users SET pass_hash=?,pass_salt=?,must_change=0 WHERE id=?').bind(await hashPw(pw,salt),salt,u.id).run();return J({ok:true})}
   // ---------- client ----------
   if(path.startsWith('/client/')){
@@ -82,7 +84,7 @@ export async function onRequest({request,env,params}){
     return J({error:'Not found'},404)}
   // ---------- admin ----------
   if(path.startsWith('/admin/')){
-    if(!needAdmin(u))return J({error:'Forbidden'},403);
+    if(!staffAllowed(u,path.slice(6),m))return J({error:'Forbidden'},403);
     const p=path.slice(6);
     if(p==='/bookings'&&m==='GET')return J((await env.DB.prepare('SELECT b.*,s.city FROM bookings b JOIN studios s ON s.id=b.studio_id ORDER BY b.date DESC,b.start DESC LIMIT 300').all()).results);
     if(p==='/booking-status'&&m==='POST'){const b=await body();if(!['inquiry','approved','declined','requested','confirmed','cancelled'].includes(b.status))return J({error:'Bad status'},400);const bk=await env.DB.prepare('SELECT * FROM bookings WHERE id=?').bind(+b.id).first();if(!bk)return J({error:'Not found'},404);
@@ -112,3 +114,136 @@ export async function onRequest({request,env,params}){
   return J({error:'Not found'},404)
   }catch(e){return J({error:'Server error'},500)}
 }
+
+// ================= Phase 3 =================
+const STAFF=['admin','manager','editor'];
+function staffAllowed(u,p,m){
+  if(!u||!STAFF.includes(u.role))return false;
+  if(u.role==='admin')return true;
+  if(u.role==='manager')return !/^\/(user|studio$|studios$|hours|block|blog)/.test(p)||(p==='/studios'&&m==='GET');
+  return /^\/(blog|blogs|media|testimonial|testimonials|submissions)/.test(p)&&!(p==='/submissions'&&m!=='GET');
+}
+const OKMIME=['image/png','image/jpeg','image/webp','application/pdf'];
+function magicOk(mime,data){let h;try{h=atob(data.slice(0,16))}catch{return false}
+  if(mime==='image/png')return h.startsWith('\x89PNG');if(mime==='image/jpeg')return h.startsWith('\xff\xd8');if(mime==='image/webp')return h.startsWith('RIFF')&&h.slice(8,12)==='WEBP';if(mime==='application/pdf')return h.startsWith('%PDF');return false}
+async function saveFile(env,kind,f,appId){
+  const mime=clean(f&&f.mime,40),data=String((f&&f.data)||'');
+  if(!OKMIME.includes(mime)||data.length<20||data.length>1500000||!/^[A-Za-z0-9+/]+=*$/.test(data)||!magicOk(mime,data))return null;
+  const r=await env.DB.prepare('INSERT INTO files(kind,name,mime,size,data,app_id) VALUES(?,?,?,?,?,?)').bind(kind,clean(f.name,120),mime,Math.floor(data.length*3/4),data,appId||null).run();
+  return r.meta.last_row_id}
+const httpsList=(a,n=6)=>(Array.isArray(a)?a:[]).slice(0,n).map(x=>clean(x,300)).filter(x=>/^https?:\/\/[^\s]+\.[^\s]+$/.test(x));
+const cleanHtml=h=>String(h||'').slice(0,200000).replace(/<\s*(script|style|iframe|object|embed|form|meta|link)[\s\S]*?(<\/\s*\1\s*>|$)/gi,'').replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi,'').replace(/(href|src)\s*=\s*("|')\s*(javascript|data|vbscript):[^"']*\2/gi,'$1=$2#$2');
+const visibleSql="status='live' AND (publish_at IS NULL OR publish_at='' OR publish_at<=?)";
+const istStamp=()=>istNow().toISOString().slice(0,16);
+const rt=h=>Math.max(1,Math.ceil(String(h||'').replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length/200));
+
+async function pubExtra(env,path,m,body,url,request){
+  if(path==='/media'&&m==='GET'){const f=await env.DB.prepare("SELECT mime,data FROM files WHERE id=? AND kind='blog'").bind(+url.searchParams.get('id')).first();if(!f)return J({error:'Not found'},404);const bin=Uint8Array.from(atob(f.data),c=>c.charCodeAt(0));return new Response(bin,{headers:{'content-type':f.mime,'cache-control':'public, max-age=86400','x-content-type-options':'nosniff'}})}
+  if(path==='/blogs'&&m==='GET'){const r=(await env.DB.prepare(`SELECT slug,title,excerpt,cover,category,tags,author,created_at,publish_at,featured,body FROM blogs WHERE ${visibleSql} ORDER BY COALESCE(NULLIF(publish_at,''),created_at) DESC LIMIT 60`).bind(istStamp()).all()).results;return J(r.map(x=>{const o={...x,rt:rt(x.body)};delete o.body;return o}))}
+  if(path==='/blog'&&m==='GET'){const r=await env.DB.prepare(`SELECT slug,title,excerpt,body,cover,category,tags,author,seo_desc,created_at,publish_at FROM blogs WHERE slug=? AND ${visibleSql}`).bind(clean(url.searchParams.get('slug'),120),istStamp()).first();return r?J({...r,rt:rt(r.body)}):J({error:'Not found'},404)}
+  if(path==='/channels'&&m==='GET')return J((await env.DB.prepare('SELECT id,name,url,avatar,subs,section FROM channels WHERE active=1 ORDER BY sort,id').all()).results);
+  if(path==='/apply'&&m==='POST'){
+    const b=await body();if(b.hp)return J({ok:true});
+    const kind=b.kind;if(!['studio','distribution'].includes(kind))return J({error:'Bad request'},400);
+    const email=clean(b.email,200).toLowerCase(),phone=clean(b.phone,30),city=clean(b.city,80);
+    if(!emailOk(email)||phone.length<7||!city)return J({error:'Please enter a valid email, phone number and city.'},400);
+    if(b.consent!==true)return J({error:'Please tick the consent box to continue.'},400);
+    const rec=await env.DB.prepare("SELECT count(*) c FROM applications WHERE email=? AND created_at>datetime('now','-1 hour')").bind(email).first();
+    const all=await env.DB.prepare("SELECT count(*) c FROM applications WHERE kind=? AND created_at>datetime('now','-1 hour')").bind(kind).first();
+    if(rec.c>=3||all.c>=40)return J({error:'Too many applications right now. Please try again later.'},429);
+    let name,data,files=[];
+    if(kind==='studio'){
+      name=clean(b.studio_name,120);const contact=clean(b.contact_name,100),addr=clean(b.address,400),reg=clean(b.registration_no,80);
+      if(!name||!contact||!addr||!reg)return J({error:'Please fill in studio name, contact person, address and registration number.'},400);
+      const photos=(Array.isArray(b.photos)?b.photos:[]).slice(0,4),cert=b.certificate;
+      if(!photos.length)return J({error:'Please upload at least one studio photo.'},400);
+      if(!cert)return J({error:'Please upload your registration certificate.'},400);
+      data={studio_name:name,contact_name:contact,address:addr,registration_no:reg,registration_type:clean(b.registration_type,60),website:clean(b.website,200),years:clean(b.years,20),setup:clean(b.setup,800),shoot_links:httpsList(b.shoot_links),about:clean(b.about,1500)};
+      const ids=[];for(const p of photos){ids.push(['photo',p])}ids.push(['certificate',cert]);files=ids;
+    }else{
+      name=clean(b.name,120);const types=(Array.isArray(b.types)?b.types:[]).filter(t=>['Paps','Influencer','Clipper','Media channel','YouTuber','Podcaster','Other'].includes(t));
+      if(!name||!types.length)return J({error:'Please enter your name or channel name and choose at least one type.'},400);
+      const links=httpsList(b.links);if(!links.length)return J({error:'Please add at least one link to your channel or profile (https://...).'},400);
+      data={name,types,channel:clean(b.channel,150),links,audience:clean(b.audience,150),platforms:clean(b.platforms,200),about:clean(b.about,1500)};
+    }
+    const r=await env.DB.prepare("INSERT INTO applications(kind,status,name,email,phone,city,data) VALUES(?,'new',?,?,?,?,?)").bind(kind,name,email,phone,city,JSON.stringify(data)).run();
+    const id=r.meta.last_row_id;
+    for(const [k,f] of files){const fid=await saveFile(env,k,f,id);if(!fid){await env.DB.batch([env.DB.prepare('DELETE FROM files WHERE app_id=?').bind(id),env.DB.prepare('DELETE FROM applications WHERE id=?').bind(id)]);return J({error:'One of the files could not be read. Use JPG, PNG or WebP photos and a PDF or image certificate under 1 MB.'},400)}}
+    return J({ok:true,ref:'AP'+id})}
+  return null}
+
+async function extra(ctx){
+  const {env,u,path,m,body,url}=ctx;const ad=u.role==='admin',mgr=ad||u.role==='manager',ed=ad||u.role==='editor';
+  const JS=s=>{try{return JSON.parse(s)}catch{return null}};
+  const today=istNow().toISOString().slice(0,10);
+  // ---- studio dashboard ----
+  if(path.startsWith('/studio/')){
+    if(u.role!=='studio')return J({error:'Forbidden'},403);const p=path.slice(7);
+    if(p==='/dashboard'&&m==='GET'){
+      const app=await env.DB.prepare('SELECT name,city,data FROM applications WHERE user_id=?').bind(u.id).first();
+      const bk=(await env.DB.prepare("SELECT b.id,b.ref,b.date,b.start,b.end,b.status,b.name,b.email,b.phone,b.topic,b.channels,b.press,b.offer_id,s.city FROM bookings b JOIN studios s ON s.id=b.studio_id WHERE b.studio_user_id=? AND b.status IN('requested','confirmed') ORDER BY b.date,b.start").bind(u.id).all()).results;
+      const oids=[...new Set(bk.map(x=>x.offer_id).filter(Boolean))];let dl=[];
+      if(oids.length)dl=(await env.DB.prepare(`SELECT id,offer_id,title,url,status FROM deliverables WHERE offer_id IN (${oids.map(()=>'?').join(',')})`).bind(...oids).all()).results;
+      const rv=(await env.DB.prepare('SELECT r.rating,r.feedback,r.created_at,b.ref,b.date FROM studio_reviews r JOIN bookings b ON b.id=r.booking_id WHERE r.studio_user_id=? ORDER BY r.id DESC').bind(u.id).all()).results;
+      const avg=rv.length?Math.round(rv.reduce((a,x)=>a+x.rating,0)/rv.length*10)/10:null;
+      return J({profile:app?{name:app.name,city:app.city,...(JS(app.data)||{})}:{name:u.name},today,bookings:bk.map(x=>({...x,deliverables:dl.filter(d=>d.offer_id===x.offer_id)})),reviews:rv,avg})}
+    if(p==='/deliverable'&&m==='POST'){const b=await body();const bk=await env.DB.prepare("SELECT id,offer_id FROM bookings WHERE id=? AND studio_user_id=? AND status IN('requested','confirmed')").bind(+b.booking_id,u.id).first();if(!bk)return J({error:'Booking not found.'},404);if(!bk.offer_id)return J({error:'This booking has no offer yet. Ask the team to create one before you add deliverables.'},400);
+      const title=clean(b.title,200),link=clean(b.url,500),st=b.status||'pending';if(!title)return J({error:'Please add a title.'},400);if(link&&!/^https:\/\//.test(link))return J({error:'Links must start with https://'},400);if(!['pending','in_progress','delivered'].includes(st))return J({error:'Bad status'},400);
+      if(b.id){const d=await env.DB.prepare('SELECT id FROM deliverables WHERE id=? AND offer_id=?').bind(+b.id,bk.offer_id).first();if(!d)return J({error:'Not found'},404);await env.DB.prepare("UPDATE deliverables SET title=?,url=?,status=?,updated_at=datetime('now') WHERE id=?").bind(title,link||null,st,d.id).run()}
+      else await env.DB.prepare('INSERT INTO deliverables(offer_id,title,url,status) VALUES(?,?,?,?)').bind(bk.offer_id,title,link||null,st).run();
+      return J({ok:true})}
+    if(p==='/deliverable-delete'&&m==='POST'){const b=await body();const d=await env.DB.prepare('SELECT d.id FROM deliverables d JOIN bookings b ON b.offer_id=d.offer_id WHERE d.id=? AND b.studio_user_id=?').bind(+b.id,u.id).first();if(!d)return J({error:'Not found'},404);await env.DB.prepare('DELETE FROM deliverables WHERE id=?').bind(d.id).run();return J({ok:true})}
+    return J({error:'Not found'},404)}
+  // ---- partner dashboard ----
+  if(path.startsWith('/partner/')){
+    if(u.role!=='partner')return J({error:'Forbidden'},403);const p=path.slice(8);
+    if(p==='/dashboard'&&m==='GET'){const app=await env.DB.prepare('SELECT name,city,data FROM applications WHERE user_id=?').bind(u.id).first();
+      const assets=(await env.DB.prepare("SELECT id,title,url,notes,created_at FROM partner_assets WHERE active=1 ORDER BY id DESC LIMIT 100").all()).results;
+      const posts=(await env.DB.prepare('SELECT p.id,p.asset_id,p.url,p.note,p.created_at,a.title FROM partner_posts p LEFT JOIN partner_assets a ON a.id=p.asset_id WHERE p.user_id=? ORDER BY p.id DESC LIMIT 100').bind(u.id).all()).results;
+      return J({profile:app?{name:app.name,city:app.city,...(JS(app.data)||{})}:{name:u.name},assets,posts})}
+    if(p==='/post'&&m==='POST'){const b=await body();const link=clean(b.url,500);if(!/^https:\/\/[^\s]+\.[^\s]+$/.test(link))return J({error:'Please paste the https:// link to your post.'},400);const a=await env.DB.prepare('SELECT id FROM partner_assets WHERE id=? AND active=1').bind(+b.asset_id).first();if(!a)return J({error:'Content not found.'},404);await env.DB.prepare('INSERT INTO partner_posts(user_id,asset_id,url,note) VALUES(?,?,?,?)').bind(u.id,a.id,link,clean(b.note,300)).run();return J({ok:true})}
+    return J({error:'Not found'},404)}
+  // ---- client rating ----
+  if(path==='/client/reviewable'&&m==='GET'){if(u.role!=='client')return J({error:'Forbidden'},403);
+    const r=(await env.DB.prepare("SELECT b.id,b.ref,b.date,b.start,s.city,COALESCE(a.name,su.name,'Studio') studio,r.rating,r.feedback FROM bookings b JOIN studios s ON s.id=b.studio_id JOIN users su ON su.id=b.studio_user_id LEFT JOIN applications a ON a.user_id=su.id LEFT JOIN studio_reviews r ON r.booking_id=b.id WHERE b.client_id=? AND b.status='confirmed' AND b.date<=? ORDER BY b.date DESC").bind(u.id,today).all()).results;return J(r)}
+  if(path==='/client/review'&&m==='POST'){if(u.role!=='client')return J({error:'Forbidden'},403);const b=await body();const rating=+b.rating;if(!(rating>=1&&rating<=5)||rating%1)return J({error:'Please choose 1 to 5 stars.'},400);
+    const bk=await env.DB.prepare("SELECT id,studio_user_id FROM bookings WHERE id=? AND client_id=? AND studio_user_id IS NOT NULL AND status='confirmed' AND date<=?").bind(+b.booking_id,u.id,today).first();if(!bk)return J({error:'You can rate a studio after your session has taken place.'},400);
+    await env.DB.prepare("INSERT INTO studio_reviews(booking_id,studio_user_id,client_id,rating,feedback) VALUES(?,?,?,?,?) ON CONFLICT(booking_id) DO UPDATE SET rating=excluded.rating,feedback=excluded.feedback").bind(bk.id,bk.studio_user_id,u.id,rating,clean(b.feedback,1000)).run();return J({ok:true})}
+  // ---- admin extras ----
+  if(path.startsWith('/admin/')&&STAFF.includes(u.role)){
+    const p=path.slice(6);if(!staffAllowed(u,p,m))return J({error:'Your role cannot do this.'},403);
+    if(p==='/users'&&m==='GET')return J((await env.DB.prepare("SELECT id,email,name,role,active,must_change,created_at FROM users WHERE role<>'client' ORDER BY id").all()).results);
+    if(p==='/user'&&m==='POST'){const b=await body();const email=clean(b.email,200).toLowerCase(),role=b.role;if(!emailOk(email))return J({error:'Valid email required.'},400);if(!['admin','manager','editor','studio','partner'].includes(role))return J({error:'Pick a role.'},400);const pw=tmpPw(),salt=rnd(16);
+      try{await env.DB.prepare('INSERT INTO users(email,name,role,pass_hash,pass_salt,must_change) VALUES(?,?,?,?,?,1)').bind(email,clean(b.name,100),role,await hashPw(pw,salt),salt).run()}catch{return J({error:'A login with this email already exists.'},409)}return J({ok:true,email,password:pw})}
+    if(p==='/user-reset'&&m==='POST'){const b=await body();const pw=tmpPw(),salt=rnd(16);const t=await env.DB.prepare("SELECT id,email FROM users WHERE id=? AND role<>'client'").bind(+b.id).first();if(!t)return J({error:'Not found'},404);await env.DB.batch([env.DB.prepare('UPDATE users SET pass_hash=?,pass_salt=?,must_change=1 WHERE id=?').bind(await hashPw(pw,salt),salt,t.id),env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(t.id)]);return J({ok:true,email:t.email,password:pw})}
+    if(p==='/user-update'&&m==='POST'){const b=await body();const t=await env.DB.prepare("SELECT id,role FROM users WHERE id=? AND role<>'client'").bind(+b.id).first();if(!t)return J({error:'Not found'},404);if(t.id===u.id||t.id===1)return J({error:'This account cannot be changed here.'},400);
+      const st=[];if(b.role!==undefined){if(!['admin','manager','editor','studio','partner'].includes(b.role))return J({error:'Bad role'},400);st.push(env.DB.prepare('UPDATE users SET role=? WHERE id=?').bind(b.role,t.id))}
+      if(b.active!==undefined){st.push(env.DB.prepare('UPDATE users SET active=? WHERE id=?').bind(b.active?1:0,t.id));if(!b.active)st.push(env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(t.id))}
+      if(b.name!==undefined)st.push(env.DB.prepare('UPDATE users SET name=? WHERE id=?').bind(clean(b.name,100),t.id));if(st.length)await env.DB.batch(st);return J({ok:true})}
+    if(p==='/studio-users'&&m==='GET')return J((await env.DB.prepare("SELECT u.id,COALESCE(a.name,u.name,u.email) name FROM users u LEFT JOIN applications a ON a.user_id=u.id WHERE u.role='studio' AND u.active=1 ORDER BY 2").all()).results);
+    if(p==='/booking-assign'&&m==='POST'){const b=await body();let sid=null;if(b.studio_user_id){const s=await env.DB.prepare("SELECT id FROM users WHERE id=? AND role='studio' AND active=1").bind(+b.studio_user_id).first();if(!s)return J({error:'Studio login not found.'},404);sid=s.id}await env.DB.prepare('UPDATE bookings SET studio_user_id=? WHERE id=?').bind(sid,+b.id).run();return J({ok:true})}
+    if(p==='/applications'&&m==='GET'){const k=url.searchParams.get('kind');const rows=(await env.DB.prepare(`SELECT id,kind,status,name,email,phone,city,data,user_id,admin_note,created_at FROM applications ${k?'WHERE kind=?':''} ORDER BY id DESC LIMIT 200`).bind(...(k?[k]:[])).all()).results;
+      const ids=rows.map(r=>r.id);let fl=[];if(ids.length)fl=(await env.DB.prepare(`SELECT id,app_id,kind,name,mime,size FROM files WHERE app_id IN (${ids.map(()=>'?').join(',')})`).bind(...ids).all()).results;
+      return J(rows.map(r=>({...r,data:JS(r.data)||{},files:fl.filter(f=>f.app_id===r.id)})))}
+    if(p==='/file'&&m==='GET'){const f=await env.DB.prepare("SELECT mime,data,name FROM files WHERE id=? AND app_id IS NOT NULL").bind(+url.searchParams.get('id')).first();if(!f)return J({error:'Not found'},404);const bin=Uint8Array.from(atob(f.data),c=>c.charCodeAt(0));return new Response(bin,{headers:{'content-type':f.mime,'content-disposition':(f.mime==='application/pdf'?'attachment':'inline')+'; filename="'+f.name.replace(/[^\w.\- ]/g,'_')+'"','cache-control':'private, no-store','x-content-type-options':'nosniff','content-security-policy':"default-src 'none'; sandbox"}})}
+    if(p==='/application-status'&&m==='POST'){const b=await body();if(!['new','reviewing','approved','rejected'].includes(b.status))return J({error:'Bad status'},400);await env.DB.prepare('UPDATE applications SET status=?,admin_note=COALESCE(?,admin_note) WHERE id=?').bind(b.status,b.note===undefined?null:clean(b.note,500),+b.id).run();return J({ok:true})}
+    if(p==='/application-login'&&m==='POST'){const b=await body();const a=await env.DB.prepare('SELECT * FROM applications WHERE id=?').bind(+b.id).first();if(!a)return J({error:'Not found'},404);if(a.user_id)return J({error:'A login was already created for this application.'},409);const role=a.kind==='studio'?'studio':'partner';const pw=tmpPw(),salt=rnd(16);
+      try{const r=await env.DB.prepare('INSERT INTO users(email,name,role,pass_hash,pass_salt,must_change) VALUES(?,?,?,?,?,1)').bind(a.email,a.name,role,await hashPw(pw,salt),salt).run();await env.DB.prepare("UPDATE applications SET user_id=?,status='approved' WHERE id=?").bind(r.meta.last_row_id,a.id).run()}catch{return J({error:'A login with this email already exists.'},409)}
+      return J({ok:true,email:a.email,password:pw,role})}
+    if(p==='/reviews'&&m==='GET')return J((await env.DB.prepare("SELECT r.id,r.rating,r.feedback,r.created_at,b.ref,b.date,b.name client,COALESCE(a.name,su.name) studio FROM studio_reviews r JOIN bookings b ON b.id=r.booking_id JOIN users su ON su.id=r.studio_user_id LEFT JOIN applications a ON a.user_id=su.id ORDER BY r.id DESC LIMIT 200").all()).results);
+    if(p==='/partner-assets'&&m==='GET')return J((await env.DB.prepare("SELECT a.*,(SELECT count(*) FROM partner_posts p WHERE p.asset_id=a.id) posts FROM partner_assets a ORDER BY id DESC").all()).results);
+    if(p==='/partner-asset'&&m==='POST'){const b=await body();const title=clean(b.title,200),link=clean(b.url,500);if(!title||!/^https:\/\//.test(link))return J({error:'Add a title and an https:// link.'},400);await env.DB.prepare('INSERT INTO partner_assets(title,url,notes) VALUES(?,?,?)').bind(title,link,clean(b.notes,500)).run();return J({ok:true})}
+    if(p==='/partner-asset-delete'&&m==='POST'){const b=await body();await env.DB.batch([env.DB.prepare('DELETE FROM partner_posts WHERE asset_id=?').bind(+b.id),env.DB.prepare('DELETE FROM partner_assets WHERE id=?').bind(+b.id)]);return J({ok:true})}
+    if(p==='/partner-posts'&&m==='GET')return J((await env.DB.prepare("SELECT p.id,p.url,p.note,p.created_at,a.title,COALESCE(ap.name,u.name,u.email) partner FROM partner_posts p JOIN users u ON u.id=p.user_id LEFT JOIN applications ap ON ap.user_id=u.id LEFT JOIN partner_assets a ON a.id=p.asset_id ORDER BY p.id DESC LIMIT 200").all()).results);
+    if(p==='/channels'&&m==='GET')return J((await env.DB.prepare('SELECT * FROM channels ORDER BY sort,id').all()).results);
+    if(p==='/channel'&&m==='POST'){const b=await body();const name=clean(b.name,100),link=clean(b.url,300),av=clean(b.avatar,500);if(!name||!/^https:\/\/[^\s]+\.[^\s]+$/.test(link))return J({error:'Add a name and an https:// link to the channel or profile.'},400);if(av&&!/^(https:\/\/|\/)/.test(av))return J({error:'Avatar must be an https:// link or uploaded image.'},400);
+      const f=[name,link,av,clean(b.subs,40),Number.isFinite(+b.sort)?+b.sort:100,b.active===false||b.active===0?0:1,b.section==='paps'?'paps':'channels'];if(b.id)await env.DB.prepare('UPDATE channels SET name=?,url=?,avatar=?,subs=?,sort=?,active=?,section=? WHERE id=?').bind(...f,+b.id).run();else await env.DB.prepare('INSERT INTO channels(name,url,avatar,subs,sort,active,section) VALUES(?,?,?,?,?,?,?)').bind(...f).run();return J({ok:true})}
+    if(p==='/channel-delete'&&m==='POST'){const b=await body();await env.DB.prepare('DELETE FROM channels WHERE id=?').bind(+b.id).run();return J({ok:true})}
+    if(p==='/testimonial-add'&&m==='POST'){const b=await body();const author=clean(b.author,100),text=clean(b.body,1200);if(!author||text.length<10)return J({error:'Add a name and the testimonial text.'},400);await env.DB.prepare('INSERT INTO testimonials(author,role,body,status) VALUES(?,?,?,?)').bind(author,clean(b.role,100),text,b.status==='pending'?'pending':'live').run();return J({ok:true})}
+    if(p==='/media'&&m==='POST'){const b=await body();if(!['image/png','image/jpeg','image/webp'].includes(b.mime))return J({error:'Use a JPG, PNG or WebP image.'},400);const id=await saveFile(env,'blog',b,null);if(!id)return J({error:'Image could not be read or is too large (max about 1 MB).'},400);return J({ok:true,url:'/api/media?id='+id})}
+    if(p==='/blogs'&&m==='GET')return J((await env.DB.prepare('SELECT id,slug,title,excerpt,body,cover,status,category,tags,author,seo_desc,publish_at,featured,created_at,updated_at FROM blogs ORDER BY id DESC').all()).results);
+    if(p==='/blog'&&m==='POST'){const b=await body();const title=clean(b.title,200);const slug=clean(b.slug||title,100).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');if(!slug||!title)return J({error:'Title required.'},400);
+      const f=[slug,title,clean(b.excerpt,400),cleanHtml(b.body),clean(b.cover,500),b.status==='live'?'live':'draft',clean(b.category,60),clean(b.tags,200),clean(b.author,80),clean(b.seo_desc,300),/^\d{4}-\d\d-\d\dT\d\d:\d\d$/.test(b.publish_at||'')?b.publish_at:'',b.featured?1:0];
+      try{if(b.id)await env.DB.prepare("UPDATE blogs SET slug=?,title=?,excerpt=?,body=?,cover=?,status=?,category=?,tags=?,author=?,seo_desc=?,publish_at=?,featured=?,updated_at=datetime('now') WHERE id=?").bind(...f,+b.id).run();else await env.DB.prepare('INSERT INTO blogs(slug,title,excerpt,body,cover,status,category,tags,author,seo_desc,publish_at,featured) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').bind(...f).run()}catch{return J({error:'That URL slug is already used.'},409)}return J({ok:true})}
+  }
+  return null}

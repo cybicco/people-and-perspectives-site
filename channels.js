@@ -1,0 +1,5 @@
+(async()=>{try{const r=await (await fetch('/api/channels')).json();const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const plat=u=>/instagram\.com/.test(u)?'Instagram':/youtube\.com|youtu\.be/.test(u)?'YouTube':'Website';
+const card=(c,i)=>`<a class="chc" style="--i:${i}" href="${esc(c.url)}" target="_blank" rel="noopener noreferrer" aria-label="${esc(c.name)} on ${plat(c.url)}"><span class="chav">${c.avatar?`<img src="${esc(c.avatar)}" alt="" loading="lazy">`:`<span>${esc(c.name.trim().charAt(0))}</span>`}</span><b>${esc(c.name)}</b>${c.subs?`<div class="chs2">${esc(c.subs)}<small>${plat(c.url)==='YouTube'?'subscribers':'followers'}</small></div>`:''}<span class="chp">${plat(c.url)}</span><span class="chv">Visit ↗</span></a>`;
+const fill=(id,sec)=>{const L=r.filter(c=>c.section===sec);const g=document.getElementById(id);if(!L.length){g.closest('section').style.display='none';return}g.innerHTML=L.map(card).join('')};
+fill('chgrid','channels');fill('papgrid','paps')}catch(e){}})();

@@ -19,3 +19,6 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px 8px
 .tag{padding:3px 10px;border-radius:99px;font-size:12px;font-weight:800;text-transform:uppercase}.t-pending{background:var(--c);color:#000}.t-confirmed{background:#2BD66B;color:#000}.t-cancelled{background:#555;color:#fff}
 .t-inquiry{background:var(--c);color:#000}.t-approved{background:#9B5CFF;color:#fff}.t-declined{background:#555;color:#fff}.t-requested{background:#FF7A00;color:#000}
 @media(max-width:700px){table,tbody,tr,td{display:block;width:100%}thead{display:none}tr{border:1px solid #262626;border-radius:14px;padding:8px 10px;margin:0 0 12px}td{border:0;padding:4px 2px}}
+tr:has(>th){display:none}@media(min-width:701px){tr:has(>th){display:table-row}}
+.rte img{max-width:100%}
+.post{font-size:18px;line-height:1.75}.post h2,.post h3{margin:1.4em 0 .4em;text-transform:none;font-family:system-ui;font-weight:800}.post img{max-width:100%;border-radius:14px;margin:14px 0}.post blockquote{border-left:4px solid var(--y);margin:1em 0;padding:4px 18px;color:#ddd;font-style:italic}.post a{color:var(--y)}

@@ -34,3 +34,8 @@ Unused older crops in `logos/` (toi.png, news18.png, ...) can be deleted.
 - shot1-shot7.jpg: client-supplied on-set photos (host and guests). Guests appear unnamed. Client to confirm guest consent/release for web use.
 
 - faces/guest1.jpg, faces/guest2.jpg: crops of client-supplied shoot photos of the two guests (man in grey blazer, woman in pink kurta), captioned neutrally as 'Guest'. Pexels stock portraits were removed from the site. Client to confirm guest consent and add names if wanted.
+
+## Phase 3 assets and notes
+- `clients/*.webp`: portrait crops from poster images supplied by the site owner (Previous clients & works). Elevate Media branding is cropped out. The wide graphics (`influential`, `astro1`, `astro2`, `doctors`) are crops/resizes of owner-supplied graphics. Names and titles are as shown on those posters. Confirm each person has agreed to be shown before launch.
+- `channels/*.jpg`: YouTube channel avatars (Hindustan Times, Zee TV, ABP News, Viral Bhayani, Instant Bollywood) fetched from the public channel pages for display as links to those channels. Subscriber counts shown for the three news channels were read from the public YouTube pages on 22 Oct 2026 and are editable in admin. No affiliation or endorsement is implied by the site; confirm the partnership wording with the owner.
+- Studio and partner applications store uploaded files in the database (admin-only access). Dashboards: /studio/ and /partner/. Staff roles: admin, manager, editor.
