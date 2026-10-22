@@ -64,6 +64,7 @@ export async function onRequest({request,env,params}){
   const u=await me(env,request);
   if(path==='/me'&&m==='GET')return u?J(u):J({error:'Not signed in'},401);
   if(!u)return J({error:'Not signed in'},401);
+  if(u.must_change&&path!=='/password')return J({error:'Please set a new password first.'},403);
   if(path==='/password'&&m==='POST'){const b=await body();const pw=String(b.new||'');if(pw.length<10)return J({error:'Use at least 10 characters.'},400);const row=await env.DB.prepare('SELECT * FROM users WHERE id=?').bind(u.id).first();if(!eq(await hashPw(String(b.current||''),row.pass_salt),row.pass_hash))return J({error:'Current password is incorrect.'},403);const salt=rnd(16);await env.DB.prepare('UPDATE users SET pass_hash=?,pass_salt=?,must_change=0 WHERE id=?').bind(await hashPw(pw,salt),salt,u.id).run();return J({ok:true})}
   // ---------- client ----------
   if(path.startsWith('/client/')){
