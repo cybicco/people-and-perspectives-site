@@ -17,3 +17,4 @@ input:focus,select:focus,textarea:focus{outline:0;border-color:var(--y)}label{di
 .chip.on{background:var(--y);color:#000;border-color:var(--y)}.chip:hover{border-color:var(--y)}
 table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px 8px;border-bottom:1px solid #262626;font-size:14px;vertical-align:top}th{color:var(--y);text-transform:uppercase;font-size:12px;letter-spacing:.08em}
 .tag{padding:3px 10px;border-radius:99px;font-size:12px;font-weight:800;text-transform:uppercase}.t-pending{background:var(--c);color:#000}.t-confirmed{background:#2BD66B;color:#000}.t-cancelled{background:#555;color:#fff}
+.t-inquiry{background:var(--c);color:#000}.t-approved{background:#9B5CFF;color:#fff}.t-declined{background:#555;color:#fff}.t-requested{background:#FF7A00;color:#000}
