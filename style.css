@@ -89,3 +89,26 @@ h2{font-family:Anton,Impact,"Arial Black",sans-serif;font-weight:400}
 .hero h1{line-height:1.25;font-size:clamp(44px,6.5vw,88px)}
 .hl{display:inline-block;line-height:1.1;padding:.02em .18em;margin:.04em 0;transform:rotate(-1deg)}
 h2{line-height:1.15}
+.center{text-align:center;margin-top:36px}
+.flow{display:grid;grid-template-columns:repeat(4,1fr);gap:22px;position:relative;counter-reset:s}
+.step{border:3px solid var(--c);border-radius:18px;padding:24px;background:#111;box-shadow:7px 7px 0 var(--c);opacity:0;transform:translateY(30px) scale(.95)}
+.reveal.in .step{animation:pop .6s forwards;animation-delay:var(--d)}
+@keyframes pop{to{opacity:1;transform:none}}
+.step .num{color:var(--c);font:400 46px Anton,Impact,sans-serif}
+.step h3{font-size:20px;text-transform:uppercase;margin:6px 0}
+.step p{font-size:15px;color:#ccc}
+.step:hover{background:var(--c);color:#000;transform:translateY(-6px) rotate(-1deg)}.step:hover .num,.step:hover p{color:#000}
+.lrow{overflow:hidden;margin:14px -5vw}
+.ltrack{display:flex;gap:18px;width:max-content;animation:lscroll 40s linear infinite}
+.lrow.rev .ltrack{animation-direction:reverse}
+.lrow .lcard{width:230px;flex:none;aspect-ratio:3/2}
+@keyframes lscroll{to{transform:translateX(-50%)}}
+.badges{display:flex;flex-wrap:wrap;gap:14px}
+.badges span{background:var(--c);color:#000;font-weight:900;text-transform:uppercase;padding:16px 26px;border-radius:999px;font-size:18px;animation:bob 3s ease-in-out infinite}
+.badges span:nth-child(even){animation-delay:.5s}
+@keyframes bob{50%{transform:translateY(-8px) rotate(-1.5deg)}}
+.map polygon{animation:glow 3s ease-in-out infinite}
+@keyframes glow{50%{filter:drop-shadow(0 0 18px #FFEA00)}}
+.route{fill:none;stroke:#fff;stroke-width:3;stroke-dasharray:8 10;animation:dash 1.2s linear infinite;opacity:.8}
+@keyframes dash{to{stroke-dashoffset:-36}}
+@media(max-width:900px){.flow{grid-template-columns:1fr 1fr}}@media(max-width:560px){.flow{grid-template-columns:1fr}}
