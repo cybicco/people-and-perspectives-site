@@ -26,5 +26,5 @@ document.querySelectorAll('.btn').forEach(b=>{b.addEventListener('pointermove',e
 // scroll-velocity skew on marquee + logo rows, drifting blobs
 let lastY=scrollY,sk=0;const cl=['#FF2E93','#00E5FF','#FFEA00','#9B5CFF'];
 document.querySelectorAll('#how,#studios,#press,#collage,#faces,#certs').forEach((s,i)=>{const b=document.createElement('div');b.className='blob';b.style.cssText=`width:320px;height:320px;background:${cl[i%4]};${i%2?'right':'left'}:-100px;top:${10+i*5}%`;s.prepend(b)});
-(function loop(){const v=scrollY-lastY;lastY=scrollY;sk+=(Math.max(-8,Math.min(8,v*.25))-sk)*.1;document.querySelectorAll('.lrow,.marquee').forEach(el=>{el.style.skewX=0;el.firstElementChild.style.transform=`skewX(${-sk}deg)`});
+(function loop(){const v=scrollY-lastY;lastY=scrollY;sk+=(Math.max(-8,Math.min(8,v*.25))-sk)*.1;document.querySelectorAll('.lrow').forEach(el=>{el.style.transform=`skewX(${-sk}deg)`});
 document.querySelectorAll('.blob').forEach((b,i)=>{const r=b.parentElement.getBoundingClientRect();b.style.transform=`translateY(${-r.top*(.08+i*.02)}px)`});requestAnimationFrame(loop)})();
