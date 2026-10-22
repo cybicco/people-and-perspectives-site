@@ -32,3 +32,5 @@ Unused older crops in `logos/` (toi.png, news18.png, ...) can be deleted.
 ## Media from the client (BTS shoot)
 - bts1-bts6.mp4 and the posters: client-supplied behind-the-scenes clips, re-encoded muted (no audio track), 360x640, lazy-loaded. Near-duplicate clips were dropped.
 - shot1-shot7.jpg: client-supplied on-set photos (host and guests). Guests appear unnamed. Client to confirm guest consent/release for web use.
+
+- faces/guest1.jpg, faces/guest2.jpg: crops of client-supplied shoot photos of the two guests (man in grey blazer, woman in pink kurta), captioned neutrally as 'Guest'. Pexels stock portraits were removed from the site. Client to confirm guest consent and add names if wanted.
