@@ -259,3 +259,4 @@ section{position:relative}
 @media(max-width:800px){.wide3,.pgrid2{grid-template-columns:1fr}.pc{width:210px}.chgrid{grid-template-columns:1fr 1fr;gap:12px}.chc{padding:22px 10px 18px}.chc b{font-size:19px}.chav{width:86px;height:86px}}
 .fgrid.fg3{grid-template-columns:repeat(3,minmax(0,340px));justify-content:center}@media(max-width:800px){.fgrid.fg3{grid-template-columns:1fr 1fr}}@media(max-width:520px){.fgrid.fg3{grid-template-columns:1fr 1fr;gap:12px}.fgrid.fg3 .face span{font-size:12px}}
 .fgrid.fg4{grid-template-columns:repeat(4,minmax(0,1fr))}@media(max-width:800px){.fgrid.fg4{grid-template-columns:1fr 1fr;gap:12px}.fgrid.fg4 .face span{font-size:12px}}
+#clients .lrow{padding:14px 0 26px}
