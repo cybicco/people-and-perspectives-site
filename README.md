@@ -28,3 +28,7 @@ Logos are trademarks of their owners and are shown as media/partner logos. Commo
 Pexels, free for commercial use, no attribution required (https://www.pexels.com/license/). Photo ids: 7023362, 7562179, 15852285, 15076258, 29847694, 28494844, 31374315, 33971228. Source URLs: `https://images.pexels.com/photos/<id>/pexels-photo-<id>.jpeg`. Replace with real guest photos.
 
 Unused older crops in `logos/` (toi.png, news18.png, ...) can be deleted.
+
+## Media from the client (BTS shoot)
+- bts1-bts6.mp4 and the posters: client-supplied behind-the-scenes clips, re-encoded muted (no audio track), 360x640, lazy-loaded. Near-duplicate clips were dropped.
+- shot1-shot7.jpg: client-supplied on-set photos (host and guests). Guests appear unnamed. Client to confirm guest consent/release for web use.
