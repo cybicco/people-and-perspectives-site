@@ -56,8 +56,8 @@ footer img{height:56px}
 @media(max-width:800px){.hero,.split,.grid3{grid-template-columns:1fr}.grid4,.stats{grid-template-columns:1fr 1fr}.nav nav a:not(.btn){display:none}.marquee{font-size:24px}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.reveal{opacity:1;transform:none}}
 .hl.pink{background:#FF2E93;color:#000}.hl.cyan{background:#00E5FF;color:#000}
-.hero h1{font-family:Impact,"Arial Black",sans-serif;font-weight:400}
-h2{font-family:Impact,"Arial Black",sans-serif;font-weight:400}
+.hero h1{font-family:Anton,Impact,"Arial Black",sans-serif;font-weight:400}
+h2{font-family:Anton,Impact,"Arial Black",sans-serif;font-weight:400}
 .grid3 article{border-color:var(--c,#FFEA00);box-shadow:8px 8px 0 var(--c,#FFEA00)}
 .grid3 article .num{color:var(--c)}
 .grid3 article:hover{background:var(--c)}
@@ -78,7 +78,7 @@ h2{font-family:Impact,"Arial Black",sans-serif;font-weight:400}
 .lcard.pend{flex-direction:column;border-style:dashed;color:#000;font-weight:900;font-size:20px}
 .lcard small,.pcard small{font-size:11px;color:#888;font-weight:400}
 .pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
-.pcard{background:var(--c);color:#000;border-radius:18px;padding:50px 20px;text-align:center;font-family:Impact,"Arial Black",sans-serif;font-size:48px;display:flex;flex-direction:column;gap:6px}
+.pcard{background:var(--c);color:#000;border-radius:18px;padding:50px 20px;text-align:center;font-family:Anton,Impact,"Arial Black",sans-serif;font-size:48px;display:flex;flex-direction:column;gap:6px}
 .pcard small{color:#222;font-family:Arial,sans-serif}
 .fgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
 .face .ph{background:var(--c);border-radius:20px;aspect-ratio:3/4;display:flex;align-items:flex-end;justify-content:center;overflow:hidden;border:3px solid #fff}
