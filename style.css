@@ -226,3 +226,4 @@ h2 .w i{display:inline-block;font-style:normal;transform:translateY(110%);transi
 section{position:relative}
 .btn.mag{transition:transform .2s}
 .marquee .track{animation-duration:18s}
+.tgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}.tq{background:#151515;border:2px solid #2a2a2a;border-radius:20px;padding:24px;margin:0;transition:.3s;display:block}.tq:hover{border-color:#FFEA00;transform:translateY(-6px)}.tq p{font-size:18px;margin:0 0 12px}.tq footer{color:#aaa;font-size:14px}@media(max-width:800px){.tgrid{grid-template-columns:1fr}}
