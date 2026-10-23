@@ -262,3 +262,5 @@ section{position:relative}
 .fgrid.fg5{grid-template-columns:repeat(5,minmax(0,1fr));gap:16px}.fgrid.fg5 .face span{font-size:13px}@media(max-width:1000px){.fgrid.fg5{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:600px){.fgrid.fg5{grid-template-columns:1fr 1fr;gap:12px}.fgrid.fg5 .face span{font-size:12px}}
 .mapcredit{font-size:11px;color:#8a8a8a;margin:6px 0 0;text-align:left}
 .mapcredit a{color:#8a8a8a;text-decoration:underline}
+.film{max-width:880px;margin:8px auto 0;border:4px solid var(--y);border-radius:20px;overflow:hidden;background:#000;box-shadow:0 20px 60px rgba(255,234,0,.18)}
+.film video{display:block;width:100%;height:auto}
