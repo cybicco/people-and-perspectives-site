@@ -288,3 +288,4 @@ section{position:relative}
 .filmplay:hover .flogo{transform:none}
 .filmplay .pbtn{position:relative;left:auto;top:auto;margin:0;flex:none}
 .filmplay .plabel{position:static;left:auto;bottom:auto;font-size:clamp(11px,2.6vw,14px)}
+@media(max-width:600px){.film{aspect-ratio:16/11}.fcover{gap:14px;padding-top:6px}.filmplay .flogo{max-width:58%;max-height:38%}.filmplay .pbtn{width:64px;height:64px;margin:0}}
