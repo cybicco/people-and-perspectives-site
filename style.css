@@ -281,3 +281,10 @@ section{position:relative}
 @keyframes pulse{70%{box-shadow:0 0 0 22px rgba(255,234,0,0)}100%{box-shadow:0 0 0 0 rgba(255,234,0,0)}}
 @media(max-width:600px){#film{padding:56px 5vw}.film{border-width:3px;border-radius:14px}}
 @media(prefers-reduced-motion:reduce){.filmplay .pbtn{animation:none}}
+
+.filmplay{background:radial-gradient(ellipse at 50% 55%,rgba(255,234,0,.22),transparent 60%),#0b0b0b;background-size:auto}
+.fcover{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(14px,3.2vw,30px)}
+.filmplay .flogo{width:auto;max-width:62%;height:auto;max-height:36%;object-fit:contain;filter:none!important;transform:none!important}
+.filmplay:hover .flogo{transform:none}
+.filmplay .pbtn{position:relative;left:auto;top:auto;margin:0;flex:none}
+.filmplay .plabel{position:static;left:auto;bottom:auto;font-size:clamp(11px,2.6vw,14px)}
